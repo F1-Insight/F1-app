@@ -98,6 +98,29 @@ app.get("/api/stints", async (req, res) => {
   }
 });
 
+app.get("/api/pit", async (req, res) => {
+  const { session_key, driver_number } = req.query;
+
+  if (!session_key || !driver_number) {
+    return res
+      .status(400)
+      .json({ error: "Missing session_key or driver_number" });
+  }
+
+  try {
+    // Make the API call to the OpenF1 pit API
+    const response = await axios.get(
+      `https://api.openf1.org/v1/pit?session_key=${session_key}&driver_number=${driver_number}`
+    );
+
+    // Send the response data back to the frontend
+    res.json(response.data);
+  } catch (error) {
+    console.error("Error fetching pit data:", error.message);
+    res.status(500).json({ error: "Failed to fetch pit data" });
+  }
+});
+
 // Start server
 app.listen(PORT, () =>
   console.log(`Server running on http://localhost:${PORT}`)

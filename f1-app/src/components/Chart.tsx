@@ -12,7 +12,6 @@ import {
 import { Line } from "react-chartjs-2";
 import "../styles/Chart.css";
 
-// Register Chart.js components
 ChartJS.register(
   CategoryScale,
   LinearScale,
@@ -37,21 +36,6 @@ const Chart: React.FC<ChartProps> = ({
   const [laps, setLaps] = useState<
     { lap_number: number; lap_duration: number; tire_compound: string }[]
   >([]);
-
-  useEffect(() => {
-    if (sessionKey && driverNumber) {
-      fetch(
-        `http://localhost:5001/api/laps?session_key=${sessionKey}&driver_number=${driverNumber}`
-      )
-        .then((response) => response.json())
-        .then((data) => {
-          const validLaps = data.filter((lap: any) => lap.lap_duration > 0); // Filter out invalid laps
-          setLaps(validLaps);
-        })
-        .catch((error) => console.error("Error fetching laps:", error));
-    }
-  }, [sessionKey, driverNumber]);
-
   const [stints, setStints] = useState<
     {
       stint_number: number;
@@ -60,6 +44,23 @@ const Chart: React.FC<ChartProps> = ({
       lap_end: number;
     }[]
   >([]);
+  const [pits, setPits] = useState<{ lap_number: number }[]>([]);
+  const [showOutliers, setShowOutliers] = useState(false);
+
+  // Fetch laps data
+  useEffect(() => {
+    if (sessionKey && driverNumber) {
+      fetch(
+        `http://localhost:5001/api/laps?session_key=${sessionKey}&driver_number=${driverNumber}`
+      )
+        .then((response) => response.json())
+        .then((data) => {
+          const validLaps = data.filter((lap: any) => lap.lap_duration > 0);
+          setLaps(validLaps);
+        })
+        .catch((error) => console.error("Error fetching laps:", error));
+    }
+  }, [sessionKey, driverNumber]);
 
   // Fetch stints data
   useEffect(() => {
@@ -73,13 +74,44 @@ const Chart: React.FC<ChartProps> = ({
     }
   }, [sessionKey, driverNumber]);
 
+  // Fetch pit stop data
+  useEffect(() => {
+    if (sessionKey && driverNumber) {
+      fetch(
+        `http://localhost:5001/api/pit?session_key=${sessionKey}&driver_number=${driverNumber}`
+      )
+        .then((response) => response.json())
+        .then((data) => setPits(data))
+        .catch((error) => console.error("Error fetching pit stops:", error));
+    }
+  }, [sessionKey, driverNumber]);
+
   const tireCompoundColors: { [key: string]: string } = {
-    Soft: "rgba(255, 0, 0, 0.6)", // Red for Soft
-    Medium: "rgba(255, 255, 0, 0.6)", // Yellow for Medium
-    Hard: "rgba(255, 255, 255, 0.6)", // White for Hard
-    Inter: "rgba(0, 128, 0, 0.6)", // Green for Intermediate
-    Wet: "rgba(0, 0, 255, 0.6)", // Blue for Wet
+    SOFT: "rgba(255, 0, 0, 0.6)", // Red
+    MEDIUM: "rgba(255, 255, 0, 0.6)", // Yellow
+    HARD: "rgba(255, 255, 255, 0.6)", // White
+    INTER: "rgba(0, 255, 0, 0.6)", // Green
+    WET: "rgba(0, 0, 255, 0.6)", // Blue
   };
+
+  const filteredLaps = laps.filter(
+    (lap) => !pits.some((pit) => pit.lap_number + 1 === lap.lap_number)
+  );
+
+  const displayedLaps = showOutliers ? laps : filteredLaps;
+
+  const pointColors = displayedLaps.map((lap) => {
+    const stint = stints.find(
+      (stint) =>
+        lap.lap_number >= stint.lap_start && lap.lap_number <= stint.lap_end
+    );
+    return tireCompoundColors[stint?.compound || ""] || "rgba(0, 0, 0, 0.6)";
+  });
+
+  const pointStyles = displayedLaps.map((lap) => {
+    const isPitLap = pits.some((pit) => pit.lap_number === lap.lap_number);
+    return isPitLap ? "triangle" : "circle"; // Triangle marker for pit stop laps
+  });
 
   const formatLapTime = (seconds: number) => {
     const minutes = Math.floor(seconds / 60);
@@ -90,28 +122,20 @@ const Chart: React.FC<ChartProps> = ({
       .padStart(2, "0");
     return `${minutes}:${formattedSeconds}.${milliseconds}`;
   };
-  console.log("Team Colour in Chart:", team_colour);
 
   const chartData = {
-    labels: laps.map((lap) => `Lap ${lap.lap_number}`),
+    labels: displayedLaps.map((lap) => `Lap ${lap.lap_number}`),
     datasets: [
       {
         label: "Lap Times",
-        data: laps.map((lap) => lap.lap_duration),
+        data: displayedLaps.map((lap) => lap.lap_duration),
         borderColor: team_colour,
         borderWidth: 2,
-        pointBackgroundColor: laps.map((lap) => {
-          const stint = stints.find(
-            (stint) =>
-              lap.lap_number >= stint.lap_start &&
-              lap.lap_number <= stint.lap_end
-          );
-          return stint
-            ? tireCompoundColors[stint.compound] || "rgba(200, 200, 200, 0.6)"
-            : "rgba(200, 200, 200, 0.6)"; // Default gray if no stint found
-        }),
+        pointBackgroundColor: pointColors,
+        pointBorderWidth: 1,
         pointRadius: 5,
         pointHoverRadius: 8,
+        pointStyle: pointStyles,
         tension: 0.4,
       },
     ],
@@ -131,7 +155,7 @@ const Chart: React.FC<ChartProps> = ({
         callbacks: {
           label: (tooltipItem: any) => {
             const lapIndex = tooltipItem.dataIndex;
-            const lap = laps[lapIndex];
+            const lap = displayedLaps[lapIndex];
             const stint = stints.find(
               (stint) =>
                 lap.lap_number >= stint.lap_start &&
@@ -139,7 +163,16 @@ const Chart: React.FC<ChartProps> = ({
             );
             const formattedTime = formatLapTime(lap.lap_duration);
             const compound = stint ? stint.compound : "Unknown Compound";
-            return `Lap ${lap.lap_number}: ${formattedTime} (${compound})`;
+            const isPitLap = pits.some(
+              (pit) => pit.lap_number === lap.lap_number
+            );
+            const pit = pits.find((pit) => pit.lap_number === lap.lap_number);
+            const pitDuration = pit
+              ? `Pit Duration: ${pit.pit_duration.toFixed(1)}s`
+              : "";
+            return `Lap ${lap.lap_number}: ${formattedTime} (${compound})${
+              isPitLap ? ` - Pit Stop\n${pitDuration}` : ""
+            }`;
           },
         },
       },
@@ -173,7 +206,15 @@ const Chart: React.FC<ChartProps> = ({
   return (
     <div className="chart-container">
       {laps.length > 0 ? (
-        <Line data={chartData} options={chartOptions} />
+        <>
+          <Line data={chartData} options={chartOptions} />
+          <button
+            className="outliers-button"
+            onClick={() => setShowOutliers((prev) => !prev)}
+          >
+            {showOutliers ? "Hide Outliers" : "Show Outliers"}
+          </button>
+        </>
       ) : (
         <p className="no-data">No lap data available.</p>
       )}
