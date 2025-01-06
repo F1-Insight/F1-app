@@ -21,6 +21,7 @@ app.get("/api/years", async (req, res) => {
 });
 
 app.get("/api/races", async (req, res) => {
+  // This API gets all of the races that took place in the year selected by the user.
   const { year } = req.query;
   try {
     const response = await axios.get(
