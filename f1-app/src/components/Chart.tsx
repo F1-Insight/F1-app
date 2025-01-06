@@ -90,7 +90,7 @@ const Chart: React.FC<ChartProps> = ({
     SOFT: "rgba(255, 0, 0, 0.6)", // Red
     MEDIUM: "rgba(255, 255, 0, 0.6)", // Yellow
     HARD: "rgba(255, 255, 255, 0.6)", // White
-    INTER: "rgba(0, 255, 0, 0.6)", // Green
+    INTERMEDIATE: "rgba(0, 255, 0, 0.6)", // Green
     WET: "rgba(0, 0, 255, 0.6)", // Blue
   };
 
