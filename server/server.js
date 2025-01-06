@@ -38,6 +38,7 @@ app.get("/api/races", async (req, res) => {
   }
 });
 
+//This API gets the session key and name for future use
 app.get("/api/sessions", async (req, res) => {
   const { meeting_key, year } = req.query;
   try {
