@@ -80,8 +80,11 @@ const Dropdowns: React.FC<{
   useEffect(() => {
     if (selectedYear && selectedRace && selectedSession && selectedDriver) {
       const selectedDriverDetails = drivers.find(
-        (driver) => driver.driver_number === selectedDriver
+        (driver) => driver.driver_number.toString() === selectedDriver
       );
+      const formattedTeamColor = selectedDriverDetails?.team_colour
+        ? `#${selectedDriverDetails.team_colour.replace("#", "")}` // Ensure the color starts with `#`
+        : "#00D1B2"; // Default color
       console.log(
         "Selected Driver Team Colour:",
         drivers,
@@ -93,7 +96,7 @@ const Dropdowns: React.FC<{
         meeting_key: selectedRace,
         session_key: selectedSession,
         driver_number: selectedDriver,
-        team_colour: selectedDriverDetails?.team_colour || "#00D1B2",
+        team_colour: formattedTeamColor,
       });
     }
   }, [selectedYear, selectedRace, selectedSession, selectedDriver, drivers]);
