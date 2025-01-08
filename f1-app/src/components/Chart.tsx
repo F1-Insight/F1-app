@@ -22,69 +22,32 @@ ChartJS.register(
   Legend
 );
 
-interface ChartProps {
-  sessionKey: string;
-  driverNumber: string;
+interface Driver {
+  driver_number: string;
   team_colour: string;
 }
 
-const Chart: React.FC<ChartProps> = ({
-  sessionKey,
-  driverNumber,
-  team_colour,
-}) => {
-  const [laps, setLaps] = useState<
-    { lap_number: number; lap_duration: number; tire_compound: string }[]
-  >([]);
-  const [stints, setStints] = useState<
-    {
+interface ChartProps {
+  sessionKey: string;
+  drivers: Driver[];
+}
+
+const Chart: React.FC<ChartProps> = ({ sessionKey, drivers }) => {
+  const [lapsData, setLapsData] = useState<{
+    [key: string]: { lap_number: number; lap_duration: number }[];
+  }>({});
+  const [stintsData, setStintsData] = useState<{
+    [key: string]: {
       stint_number: number;
       compound: string;
       lap_start: number;
       lap_end: number;
-    }[]
-  >([]);
-  const [pits, setPits] = useState<{ lap_number: number }[]>([]);
+    }[];
+  }>({});
+  const [pitsData, setPitsData] = useState<{
+    [key: string]: { lap_number: number; pit_duration: number }[];
+  }>({});
   const [showOutliers, setShowOutliers] = useState(false);
-
-  // Fetch laps data
-  useEffect(() => {
-    if (sessionKey && driverNumber) {
-      fetch(
-        `http://localhost:5001/api/laps?session_key=${sessionKey}&driver_number=${driverNumber}`
-      )
-        .then((response) => response.json())
-        .then((data) => {
-          const validLaps = data.filter((lap: any) => lap.lap_duration > 0);
-          setLaps(validLaps);
-        })
-        .catch((error) => console.error("Error fetching laps:", error));
-    }
-  }, [sessionKey, driverNumber]);
-
-  // Fetch stints data
-  useEffect(() => {
-    if (sessionKey && driverNumber) {
-      fetch(
-        `http://localhost:5001/api/stints?session_key=${sessionKey}&driver_number=${driverNumber}`
-      )
-        .then((response) => response.json())
-        .then((data) => setStints(data))
-        .catch((error) => console.error("Error fetching stints:", error));
-    }
-  }, [sessionKey, driverNumber]);
-
-  // Fetch pit stop data
-  useEffect(() => {
-    if (sessionKey && driverNumber) {
-      fetch(
-        `http://localhost:5001/api/pit?session_key=${sessionKey}&driver_number=${driverNumber}`
-      )
-        .then((response) => response.json())
-        .then((data) => setPits(data))
-        .catch((error) => console.error("Error fetching pit stops:", error));
-    }
-  }, [sessionKey, driverNumber]);
 
   const tireCompoundColors: { [key: string]: string } = {
     SOFT: "rgba(255, 0, 0, 0.6)", // Red
@@ -94,51 +57,95 @@ const Chart: React.FC<ChartProps> = ({
     WET: "rgba(0, 0, 255, 0.6)", // Blue
   };
 
-  const filteredLaps = laps.filter(
-    (lap) => !pits.some((pit) => pit.lap_number + 1 === lap.lap_number)
-  );
+  // Fetch data for all drivers
+  useEffect(() => {
+    if (sessionKey && drivers.length > 0) {
+      const fetchData = async () => {
+        const driverLaps: { [key: string]: any[] } = {};
+        const driverStints: { [key: string]: any[] } = {};
+        const driverPits: { [key: string]: any[] } = {};
 
-  const displayedLaps = showOutliers ? laps : filteredLaps;
+        await Promise.all(
+          drivers.map(async (driver) => {
+            // Fetch laps
+            const lapsResponse = await fetch(
+              `http://localhost:5001/api/laps?session_key=${sessionKey}&driver_number=${driver.driver_number}`
+            );
+            const laps = await lapsResponse.json();
+            driverLaps[driver.driver_number] = laps.filter(
+              (lap: any) => lap.lap_duration > 0
+            );
 
-  const pointColors = displayedLaps.map((lap) => {
-    const stint = stints.find(
-      (stint) =>
-        lap.lap_number >= stint.lap_start && lap.lap_number <= stint.lap_end
+            // Fetch stints
+            const stintsResponse = await fetch(
+              `http://localhost:5001/api/stints?session_key=${sessionKey}&driver_number=${driver.driver_number}`
+            );
+            const stints = await stintsResponse.json();
+            driverStints[driver.driver_number] = stints;
+
+            // Fetch pits
+            const pitsResponse = await fetch(
+              `http://localhost:5001/api/pit?session_key=${sessionKey}&driver_number=${driver.driver_number}`
+            );
+            const pits = await pitsResponse.json();
+            driverPits[driver.driver_number] = pits;
+          })
+        );
+
+        setLapsData(driverLaps);
+        setStintsData(driverStints);
+        setPitsData(driverPits);
+      };
+
+      fetchData().catch((error) =>
+        console.error("Error fetching data:", error)
+      );
+    }
+  }, [sessionKey, drivers]);
+
+  // Prepare datasets
+  const datasets = drivers.map((driver) => {
+    const laps = lapsData[driver.driver_number] || [];
+    const stints = stintsData[driver.driver_number] || [];
+    const pits = pitsData[driver.driver_number] || [];
+
+    const filteredLaps = laps.filter(
+      (lap) =>
+        !pits.some((pit) => pit.lap_number + 1 === lap.lap_number) ||
+        showOutliers
     );
-    return tireCompoundColors[stint?.compound || ""] || "rgba(0, 0, 0, 0.6)";
-  });
 
-  const pointStyles = displayedLaps.map((lap) => {
-    const isPitLap = pits.some((pit) => pit.lap_number === lap.lap_number);
-    return isPitLap ? "triangle" : "circle"; // Triangle marker for pit stop laps
-  });
+    const pointColors = filteredLaps.map((lap) => {
+      const stint = stints.find(
+        (stint) =>
+          lap.lap_number >= stint.lap_start && lap.lap_number <= stint.lap_end
+      );
+      return tireCompoundColors[stint?.compound || ""] || "rgba(0, 0, 0, 0.6)";
+    });
 
-  const formatLapTime = (seconds: number) => {
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = seconds % 60;
-    const milliseconds = (remainingSeconds % 1).toFixed(3).substring(2);
-    const formattedSeconds = Math.floor(remainingSeconds)
-      .toString()
-      .padStart(2, "0");
-    return `${minutes}:${formattedSeconds}.${milliseconds}`;
-  };
+    const pointStyles = filteredLaps.map((lap) => {
+      const isPitLap = pits.some((pit) => pit.lap_number === lap.lap_number);
+      return isPitLap ? "triangle" : "circle"; // Triangle marker for pit stop laps
+    });
+
+    return {
+      label: `Driver ${driver.driver_number}`,
+      data: filteredLaps.map((lap) => lap.lap_duration),
+      borderColor: driver.team_colour,
+      borderWidth: 2,
+      pointBackgroundColor: pointColors,
+      pointBorderWidth: 1,
+      pointStyle: pointStyles,
+      pointRadius: 5,
+      pointHoverRadius: 8,
+      tension: 0.4,
+    };
+  });
 
   const chartData = {
-    labels: displayedLaps.map((lap) => `Lap ${lap.lap_number}`),
-    datasets: [
-      {
-        label: "Lap Times",
-        data: displayedLaps.map((lap) => lap.lap_duration),
-        borderColor: team_colour,
-        borderWidth: 2,
-        pointBackgroundColor: pointColors,
-        pointBorderWidth: 1,
-        pointRadius: 5,
-        pointHoverRadius: 8,
-        pointStyle: pointStyles,
-        tension: 0.4,
-      },
-    ],
+    labels:
+      Object.values(lapsData)[0]?.map((lap) => `Lap ${lap.lap_number}`) || [],
+    datasets: datasets,
   };
 
   const chartOptions = {
@@ -154,24 +161,25 @@ const Chart: React.FC<ChartProps> = ({
       tooltip: {
         callbacks: {
           label: (tooltipItem: any) => {
+            const driverNumber =
+              drivers[tooltipItem.datasetIndex].driver_number;
             const lapIndex = tooltipItem.dataIndex;
-            const lap = displayedLaps[lapIndex];
-            const stint = stints.find(
+            const lap = lapsData[driverNumber][lapIndex];
+            const stint = stintsData[driverNumber]?.find(
               (stint) =>
                 lap.lap_number >= stint.lap_start &&
                 lap.lap_number <= stint.lap_end
             );
-            const formattedTime = formatLapTime(lap.lap_duration);
-            const compound = stint ? stint.compound : "Unknown Compound";
-            const isPitLap = pits.some(
+            const pit = pitsData[driverNumber]?.find(
               (pit) => pit.lap_number === lap.lap_number
             );
-            const pit = pits.find((pit) => pit.lap_number === lap.lap_number);
+            const formattedTime = formatLapTime(lap.lap_duration);
+            const compound = stint ? stint.compound : "Unknown Compound";
             const pitDuration = pit
               ? `Pit Duration: ${pit.pit_duration.toFixed(1)}s`
               : "";
             return `Lap ${lap.lap_number}: ${formattedTime} (${compound})${
-              isPitLap ? ` - Pit Stop\n${pitDuration}` : ""
+              pit ? ` - Pit Stop\n${pitDuration}` : ""
             }`;
           },
         },
@@ -192,20 +200,29 @@ const Chart: React.FC<ChartProps> = ({
         },
         ticks: {
           color: "#FFFFFF",
-          callback: (value: number) => formatLapTime(value), // Format Y-axis ticks
         },
         title: {
           display: true,
-          text: "Lap Time (MM:SS.mmm)",
+          text: "Lap Time (s)",
           color: "#FFFFFF",
         },
       },
     },
   };
 
+  const formatLapTime = (seconds: number) => {
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    const milliseconds = (remainingSeconds % 1).toFixed(3).substring(2);
+    const formattedSeconds = Math.floor(remainingSeconds)
+      .toString()
+      .padStart(2, "0");
+    return `${minutes}:${formattedSeconds}.${milliseconds}`;
+  };
+
   return (
     <div className="chart-container">
-      {laps.length > 0 ? (
+      {drivers.length > 0 ? (
         <>
           <Line data={chartData} options={chartOptions} />
           <button
