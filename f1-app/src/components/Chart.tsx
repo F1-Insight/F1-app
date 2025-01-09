@@ -178,7 +178,7 @@ const Chart: React.FC<ChartProps> = ({ sessionKey, drivers }) => {
             const pitDuration = pit
               ? `Pit Duration: ${pit.pit_duration.toFixed(1)}s`
               : "";
-            return `Lap ${lap.lap_number}: ${formattedTime} (${compound})${
+            return `${formattedTime} (${compound})${
               pit ? ` - Pit Stop\n${pitDuration}` : ""
             }`;
           },
