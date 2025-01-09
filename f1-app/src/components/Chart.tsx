@@ -61,47 +61,49 @@ const Chart: React.FC<ChartProps> = ({ sessionKey, drivers }) => {
   useEffect(() => {
     if (sessionKey && drivers.length > 0) {
       const fetchData = async () => {
-        const driverLaps: { [key: string]: any[] } = {};
-        const driverStints: { [key: string]: any[] } = {};
-        const driverPits: { [key: string]: any[] } = {};
-
+        const driverLaps: { [key: string]: any[] } = { ...lapsData };
+        const driverStints: { [key: string]: any[] } = { ...stintsData };
+        const driverPits: { [key: string]: any[] } = { ...pitsData };
+  
         await Promise.all(
-          drivers.map(async (driver) => {
-            // Fetch laps
-            const lapsResponse = await fetch(
-              `http://localhost:5001/api/laps?session_key=${sessionKey}&driver_number=${driver.driver_number}`
-            );
-            const laps = await lapsResponse.json();
-            driverLaps[driver.driver_number] = laps.filter(
-              (lap: any) => lap.lap_duration > 0
-            );
-
-            // Fetch stints
-            const stintsResponse = await fetch(
-              `http://localhost:5001/api/stints?session_key=${sessionKey}&driver_number=${driver.driver_number}`
-            );
-            const stints = await stintsResponse.json();
-            driverStints[driver.driver_number] = stints;
-
-            // Fetch pits
-            const pitsResponse = await fetch(
-              `http://localhost:5001/api/pit?session_key=${sessionKey}&driver_number=${driver.driver_number}`
-            );
-            const pits = await pitsResponse.json();
-            driverPits[driver.driver_number] = pits;
-          })
+          drivers
+            .filter((driver) => !lapsData[driver.driver_number]) // Only fetch for drivers without data
+            .map(async (driver) => {
+              // Fetch laps
+              const lapsResponse = await fetch(
+                `http://localhost:5001/api/laps?session_key=${sessionKey}&driver_number=${driver.driver_number}`
+              );
+              const laps = await lapsResponse.json();
+              driverLaps[driver.driver_number] = laps.filter(
+                (lap: any) => lap.lap_duration > 0
+              );
+  
+              // Fetch stints
+              const stintsResponse = await fetch(
+                `http://localhost:5001/api/stints?session_key=${sessionKey}&driver_number=${driver.driver_number}`
+              );
+              const stints = await stintsResponse.json();
+              driverStints[driver.driver_number] = stints;
+  
+              // Fetch pits
+              const pitsResponse = await fetch(
+                `http://localhost:5001/api/pit?session_key=${sessionKey}&driver_number=${driver.driver_number}`
+              );
+              const pits = await pitsResponse.json();
+              driverPits[driver.driver_number] = pits;
+            })
         );
-
+  
         setLapsData(driverLaps);
         setStintsData(driverStints);
         setPitsData(driverPits);
       };
-
+  
       fetchData().catch((error) =>
         console.error("Error fetching data:", error)
       );
     }
-  }, [sessionKey, drivers]);
+  }, [sessionKey, drivers, lapsData, stintsData, pitsData]);
 
   // Prepare datasets
   const datasets = drivers.map((driver) => {
