@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -58,17 +58,21 @@ const Chart: React.FC<ChartProps> = ({ sessionKey, drivers }) => {
   };
 
   // Fetch data for all drivers
+  const fetchedDriversRef = useRef<{ [key: string]: boolean }>({});
+
   useEffect(() => {
     if (sessionKey && drivers.length > 0) {
       const fetchData = async () => {
-        const driverLaps: { [key: string]: any[] } = { ...lapsData };
-        const driverStints: { [key: string]: any[] } = { ...stintsData };
-        const driverPits: { [key: string]: any[] } = { ...pitsData };
-  
+        const driverLaps = { ...lapsData };
+        const driverStints = { ...stintsData };
+        const driverPits = { ...pitsData };
+
         await Promise.all(
           drivers
-            .filter((driver) => !lapsData[driver.driver_number]) // Only fetch for drivers without data
+            .filter((driver) => !fetchedDriversRef.current[driver.driver_number])
             .map(async (driver) => {
+              fetchedDriversRef.current[driver.driver_number] = true;
+
               // Fetch laps
               const lapsResponse = await fetch(
                 `http://localhost:5001/api/laps?session_key=${sessionKey}&driver_number=${driver.driver_number}`
@@ -77,14 +81,14 @@ const Chart: React.FC<ChartProps> = ({ sessionKey, drivers }) => {
               driverLaps[driver.driver_number] = laps.filter(
                 (lap: any) => lap.lap_duration > 0
               );
-  
+
               // Fetch stints
               const stintsResponse = await fetch(
                 `http://localhost:5001/api/stints?session_key=${sessionKey}&driver_number=${driver.driver_number}`
               );
               const stints = await stintsResponse.json();
               driverStints[driver.driver_number] = stints;
-  
+
               // Fetch pits
               const pitsResponse = await fetch(
                 `http://localhost:5001/api/pit?session_key=${sessionKey}&driver_number=${driver.driver_number}`
@@ -93,17 +97,15 @@ const Chart: React.FC<ChartProps> = ({ sessionKey, drivers }) => {
               driverPits[driver.driver_number] = pits;
             })
         );
-  
+
         setLapsData(driverLaps);
         setStintsData(driverStints);
         setPitsData(driverPits);
       };
-  
-      fetchData().catch((error) =>
-        console.error("Error fetching data:", error)
-      );
+
+      fetchData().catch((error) => console.error("Error fetching data:", error));
     }
-  }, [sessionKey, drivers, lapsData, stintsData, pitsData]);
+  }, [sessionKey, drivers]);
 
   // Prepare datasets
   const datasets = drivers.map((driver) => {
