@@ -5,37 +5,34 @@ import Chart from "./components/Chart";
 const App: React.FC = () => {
   const [selections, setSelections] = useState<{
     session_key: string;
-    driver_number: string;
-    team_colour: string;
-  }>({ session_key: "", driver_number: "", team_colour: "" });
+    drivers: { driver_number: string; team_colour: string }[];
+  }>({
+    session_key: "",
+    drivers: [],
+  });
 
   const handleSelectionsChange = (newSelections: {
     session_key: string;
-    driver_number: string;
-    team_colour: string;
+    drivers: { driver_number: string; team_colour: string }[];
   }) => {
     console.log("New Selections Received:", newSelections);
-    // Map keys to match the expected structure
-    setSelections({
-      session_key: newSelections.session_key,
-      driver_number: newSelections.driver_number,
-      team_colour: newSelections.team_colour,
-    });
+    setSelections(newSelections);
   };
+
   console.log("Current Selections:", selections);
+
   return (
     <div className="App">
       <h1>F1 Insight</h1>
       <Dropdown onSelectionsChange={handleSelectionsChange} />
-      {selections.session_key && selections.driver_number ? (
+      {selections.session_key && selections.drivers.length > 0 ? (
         <Chart
           sessionKey={selections.session_key}
-          driverNumber={selections.driver_number}
-          team_colour={selections.team_colour}
+          drivers={selections.drivers}
         />
       ) : (
         <p className="no-data">
-          Please select a year, race, session, and driver to view the data.
+          Please select a year, race, session, and drivers to view the data.
         </p>
       )}
     </div>

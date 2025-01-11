@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
+import Select from "react-select";
 import "../styles/Dropdowns.css";
 
 const Dropdowns: React.FC<{
@@ -6,8 +7,7 @@ const Dropdowns: React.FC<{
     year: string;
     meeting_key: string;
     session_key: string;
-    driver_number: string;
-    team_colour: string;
+    drivers: { driver_number: string; team_colour: string }[];
   }) => void;
 }> = ({ onSelectionsChange }) => {
   const [years, setYears] = useState<string[]>([]);
@@ -24,7 +24,9 @@ const Dropdowns: React.FC<{
   const [selectedYear, setSelectedYear] = useState("");
   const [selectedRace, setSelectedRace] = useState("");
   const [selectedSession, setSelectedSession] = useState("");
-  const [selectedDriver, setSelectedDriver] = useState("");
+  const [selectedDrivers, setSelectedDrivers] = useState<
+    { value: string; label: string; color: string }[]
+  >([]);
 
   // Fetch years from backend when component mounts
   useEffect(() => {
@@ -46,7 +48,7 @@ const Dropdowns: React.FC<{
     }
   }, [selectedYear]);
 
-  // Fetch sessions for the selected race and year from backend
+  // Fetch sessions for the selected race from backend
   useEffect(() => {
     if (selectedRace) {
       fetch(
@@ -63,47 +65,46 @@ const Dropdowns: React.FC<{
   // Fetch drivers for the selected session from backend
   useEffect(() => {
     if (selectedSession) {
-      console.log("Selected Session Key:", selectedSession);
       fetch(`http://localhost:5001/api/drivers?session_key=${selectedSession}`)
         .then((res) => res.json())
-        .then((data) => {
-          console.log("Fetched Drivers:", data);
-          setDrivers(data);
-        })
+        .then((data) =>
+          setDrivers(
+            data.map((driver: any) => ({
+              full_name: driver.driver_name,
+              driver_number: driver.driver_number,
+              team_colour: driver.team_colour,
+            }))
+          )
+        )
         .catch((err) => console.error("Error fetching drivers:", err));
     } else {
       setDrivers([]);
     }
-  }, [selectedSession, selectedRace]);
+  }, [selectedSession]);
 
-  // Pass selections to parent when all dropdowns have valid selections
+  // Pass selections to parent
   useEffect(() => {
-    if (selectedYear && selectedRace && selectedSession && selectedDriver) {
-      const selectedDriverDetails = drivers.find(
-        (driver) => driver.driver_number.toString() === selectedDriver
-      );
-      const formattedTeamColor = selectedDriverDetails?.team_colour
-        ? `#${selectedDriverDetails.team_colour.replace("#", "")}` // Ensure the color starts with `#`
-        : "#00D1B2"; // Default color
-      console.log(
-        "Selected Driver Team Colour:",
-        drivers,
-        selectedDriverDetails,
-        selectedDriverDetails?.team_colour
-      );
+    if (selectedYear && selectedRace && selectedSession && selectedDrivers) {
       onSelectionsChange({
         year: selectedYear,
         meeting_key: selectedRace,
         session_key: selectedSession,
-        driver_number: selectedDriver,
-        team_colour: formattedTeamColor,
+        drivers: selectedDrivers.map((driver) => ({
+          driver_number: driver.value,
+          team_colour: driver.color,
+        })),
       });
     }
-  }, [selectedYear, selectedRace, selectedSession, selectedDriver, drivers]);
+  }, [selectedYear, selectedRace, selectedSession, selectedDrivers]);
+
+  const driverOptions = drivers.map((driver) => ({
+    value: driver.driver_number,
+    label: driver.full_name,
+    color: `#${driver.team_colour}`,
+  }));
 
   return (
     <div className="dropdowns">
-      {/* Year Dropdown */}
       <select
         className="dropdown"
         value={selectedYear}
@@ -117,7 +118,6 @@ const Dropdowns: React.FC<{
         ))}
       </select>
 
-      {/* Race Dropdown */}
       <select
         className="dropdown"
         value={selectedRace}
@@ -132,7 +132,6 @@ const Dropdowns: React.FC<{
         ))}
       </select>
 
-      {/* Session Dropdown */}
       <select
         className="dropdown"
         value={selectedSession}
@@ -147,28 +146,36 @@ const Dropdowns: React.FC<{
         ))}
       </select>
 
-      {/* Driver Dropdown */}
-      {/* Driver Dropdown */}
-      <select
-        className="dropdown"
-        value={selectedDriver}
-        onChange={(e) => setSelectedDriver(e.target.value)}
-        disabled={!drivers.length}
-      >
-        <option value="">Select Driver</option>
-        {drivers.map((driver) => (
-          <option
-            key={driver.driver_number}
-            value={driver.driver_number}
-            style={{
-              backgroundColor: driver.team_colour || "#FFFFFF",
-              color: "#000000",
-            }}
-          >
-            {driver.driver_name}
-          </option>
-        ))}
-      </select>
+      <Select
+        isMulti
+        options={driverOptions}
+        value={selectedDrivers}
+        onChange={(selected) => setSelectedDrivers(selected || [])}
+        className="driver-dropdown"
+        placeholder="Select Drivers"
+        styles={{
+          control: (base) => ({
+            ...base,
+            backgroundColor: "#000",
+            color: "#fff",
+            borderColor: "#fff",
+          }),
+          option: (base, { data }) => ({
+            ...base,
+            backgroundColor: data.color,
+            color: "#fff",
+          }),
+          multiValue: (base, { data }) => ({
+            ...base,
+            backgroundColor: data.color,
+            color: "#fff",
+          }),
+          multiValueLabel: (base) => ({
+            ...base,
+            color: "#fff",
+          }),
+        }}
+      />
     </div>
   );
 };
