@@ -69,7 +69,9 @@ const Chart: React.FC<ChartProps> = ({ sessionKey, drivers }) => {
 
         await Promise.all(
           drivers
-            .filter((driver) => !fetchedDriversRef.current[driver.driver_number])
+            .filter(
+              (driver) => !fetchedDriversRef.current[driver.driver_number]
+            )
             .map(async (driver) => {
               fetchedDriversRef.current[driver.driver_number] = true;
 
@@ -103,9 +105,18 @@ const Chart: React.FC<ChartProps> = ({ sessionKey, drivers }) => {
         setPitsData(driverPits);
       };
 
-      fetchData().catch((error) => console.error("Error fetching data:", error));
+      fetchData().catch((error) =>
+        console.error("Error fetching data:", error)
+      );
     }
   }, [sessionKey, drivers]);
+
+  const maxLapNumber = Math.max(
+    ...Object.values(lapsData).flatMap((laps) =>
+      laps.map((lap) => lap.lap_number)
+    )
+  );
+  const allLaps = Array.from({ length: maxLapNumber }, (_, i) => i + 1);
 
   // Prepare datasets
   const datasets = drivers.map((driver) => {
@@ -118,6 +129,11 @@ const Chart: React.FC<ChartProps> = ({ sessionKey, drivers }) => {
         !pits.some((pit) => pit.lap_number + 1 === lap.lap_number) ||
         showOutliers
     );
+
+    const paddedLaps = allLaps.map((lapNumber) => {
+      const lapData = laps.find((lap) => lap.lap_number === lapNumber);
+      return lapData ? lapData.lap_duration : null; // Fill missing laps with `null`
+    });
 
     const pointColors = filteredLaps.map((lap) => {
       const stint = stints.find(
@@ -134,7 +150,7 @@ const Chart: React.FC<ChartProps> = ({ sessionKey, drivers }) => {
 
     return {
       label: `Driver ${driver.driver_number}`,
-      data: filteredLaps.map((lap) => lap.lap_duration),
+      data: paddedLaps,
       borderColor: driver.team_colour,
       borderWidth: 2,
       pointBackgroundColor: pointColors,
@@ -147,8 +163,7 @@ const Chart: React.FC<ChartProps> = ({ sessionKey, drivers }) => {
   });
 
   const chartData = {
-    labels:
-      Object.values(lapsData)[0]?.map((lap) => `Lap ${lap.lap_number}`) || [],
+    labels: allLaps.map((lapNumber) => `Lap ${lapNumber}`),
     datasets: datasets,
   };
 
