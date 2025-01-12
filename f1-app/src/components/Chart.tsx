@@ -198,7 +198,7 @@ const Chart: React.FC<ChartProps> = ({ sessionKey, drivers }) => {
               ? `Pit Duration: ${pit.pit_duration.toFixed(1)}s`
               : "";
             return `${formattedTime} (${compound})${
-              pit ? ` - Pit Stop\n${pitDuration}` : ""
+              pit ? ` ${pitDuration}` : ""
             }`;
           },
         },
