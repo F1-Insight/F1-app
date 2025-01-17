@@ -64,3 +64,7 @@
 
 ## LICENSE
  - **ISC License:** This project is open-source and available under the ISC License.
+
+
+## DISCLAIMER
+F1-Insight is an unofficial project and is not affiliated with Formula 1 companies. All F1-related trademarks are owned by Formula One Licensing B.V.
