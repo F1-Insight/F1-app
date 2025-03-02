@@ -83,6 +83,7 @@ const Chart: React.FC<ChartProps> = ({ sessionKey, drivers }) => {
               driverLaps[driver.driver_number] = laps.filter(
                 (lap: any) => lap.lap_duration > 0
               );
+              /* This is where the laps are being processed */
 
               // Fetch stints
               const stintsResponse = await fetch(
@@ -124,15 +125,38 @@ const Chart: React.FC<ChartProps> = ({ sessionKey, drivers }) => {
     const stints = stintsData[driver.driver_number] || [];
     const pits = pitsData[driver.driver_number] || [];
 
-    const filteredLaps = laps.filter(
-      (lap) =>
-        !pits.some((pit) => pit.lap_number + 1 === lap.lap_number) ||
-        showOutliers
-    );
+    const calculateIQR = (values: number[]) => {
+      if (values.length < 4)
+        return { lowerBound: -Infinity, upperBound: Infinity };
+
+      values.sort((a, b) => a - b);
+      const q1 = values[Math.floor(values.length * 0.25)];
+      const q3 = values[Math.floor(values.length * 0.75)];
+      const iqr = q3 - q1;
+      return { lowerBound: q1 - 1.5 * iqr, upperBound: q3 + 1.5 * iqr };
+    };
+
+    const lapTimes = laps.map((lap) => lap.lap_duration);
+    const { lowerBound, upperBound } = calculateIQR(lapTimes);
+
+    const filteredLaps = laps.filter((lap) => {
+      //const isPitLap = pits.some((pit) => pit.lap_number === lap.lap_number);
+      const isOutlier =
+        lap.lap_duration < lowerBound || lap.lap_duration > upperBound;
+      return showOutliers || !isOutlier;
+    });
+
+    let lastValidLapTime: number | null = null; // Store last valid lap time
 
     const paddedLaps = allLaps.map((lapNumber) => {
-      const lapData = laps.find((lap) => lap.lap_number === lapNumber);
-      return lapData ? lapData.lap_duration : null; // Fill missing laps with `null`
+      const lapData = filteredLaps.find((lap) => lap.lap_number === lapNumber);
+
+      if (lapData) {
+        lastValidLapTime = lapData.lap_duration; // Update last valid value
+        return lapData.lap_duration;
+      } else {
+        return lastValidLapTime; // Carry forward last valid value to maintain connection
+      }
     });
 
     const pointColors = filteredLaps.map((lap) => {
