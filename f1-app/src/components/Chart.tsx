@@ -11,6 +11,7 @@ import {
 } from "chart.js";
 import { Line } from "react-chartjs-2";
 import "../styles/Chart.css";
+import Telemetry from "./Telemetry";
 
 ChartJS.register(
   CategoryScale,
@@ -56,6 +57,8 @@ const Chart: React.FC<ChartProps> = ({ sessionKey, drivers }) => {
     INTERMEDIATE: "rgba(0, 255, 0, 0.6)", // Green
     WET: "rgba(0, 0, 255, 0.6)", // Blue
   };
+
+  const [selectedLaps, setSelectedLaps] = useState<number[]>([]);
 
   // Fetch data for all drivers
   const fetchedDriversRef = useRef<{ [key: string]: boolean }>({});
@@ -193,6 +196,19 @@ const Chart: React.FC<ChartProps> = ({ sessionKey, drivers }) => {
 
   const chartOptions = {
     responsive: true,
+    onClick: (event: any, elements: any[]) => {
+      if (elements.length > 0) {
+        const clickedIndex = elements[0].index; // Get clicked point index
+        const clickedLapNumber = allLaps[clickedIndex]; // Get lap number
+
+        setSelectedLaps((prev) => {
+          // Toggle lap selection (if already selected, remove it)
+          return prev.includes(clickedLapNumber)
+            ? prev.filter((lap) => lap !== clickedLapNumber)
+            : [...prev, clickedLapNumber];
+        });
+      }
+    },
     plugins: {
       legend: {
         display: true,
@@ -274,6 +290,7 @@ const Chart: React.FC<ChartProps> = ({ sessionKey, drivers }) => {
           >
             {showOutliers ? "Hide Outliers" : "Show Outliers"}
           </button>
+          <Telemetry selectedLaps={selectedLaps} />
         </>
       ) : (
         <p className="no-data">No lap data available.</p>
